@@ -1,26 +1,31 @@
 #include <Arduino.h>
+#include "LedController.h"
 
 const int LED_PIN = LED_BUILTIN;
 
+LedController led;
+
 void setup()
 {
-    pinMode(LED_PIN, OUTPUT);
+	led.init(LED_PIN, true);
+
+    // Indicate that MCU is initializing
+    led.on();
 
     Serial.begin(115200);
 
     Serial.println();
     Serial.println("Start programu");
+
+	led.repeatBlink(50, 2000);
 }
 
 void loop()
 {
+	unsigned long time = millis();
     static int cnt = 0;
 
-    digitalWrite(LED_PIN, LOW);
-    delay(500);
-
-    digitalWrite(LED_PIN, HIGH);
-    delay(500);
+	led.process(time);
 
     cnt++;
 
