@@ -3,9 +3,15 @@
 #include <LittleFS.h>
 #include <ESP8266WiFi.h>
 
+#include "TunerController.h"
+#include "WebGui.h"
+#include "TimeUtils.h"
+
 const int LED_PIN = LED_BUILTIN;
 
 LedController led;
+TunerController controller;
+WebGui webGui(controller);
 
 String wifiSsid;
 String wifiPassword;
@@ -343,8 +349,9 @@ void setup()
         //startWebServer();
     }
 
+	controller.begin();
+	webGui.begin();
 
-	// WiFi.begin(wifiSsid.c_str(), wifiPassword.c_str());
 
 	led.repeatBlink(50, 2000);
 }
@@ -362,4 +369,7 @@ void loop()
 
 	if (Serial.available() == true)
         checkSerialCommand(Serial.readString());
+
+	controller.process();
+    webGui.process();
 }
