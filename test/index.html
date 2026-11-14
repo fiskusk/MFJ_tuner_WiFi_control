@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>MFJ Tuner Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div id="ssid">SSID</div>
+        <div id="ip">IP</div>
+        <div id="clock">--:--:--</div>
+    </div>
+
+    <div class="grid">
+        <button id="cup" class="cmd-btn">C UP</button>
+        <button id="lup" class="cmd-btn">L UP</button>
+        <button id="tune" class="cmd-btn tune">TUNE</button>
+        <button id="ant" class="ant-btn">ANT1</button>
+        <div id="led1" class="led led-off">LED1</div>
+        <button id="cdown" class="cmd-btn">C DN</button>
+        <button id="ldown" class="cmd-btn">L DN</button>
+        <div id="led2" class="led led-off">LED2</div>
+    </div>
+
+    <div class="footer">
+        Queue: <span id="queue">0</span>
+    </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
