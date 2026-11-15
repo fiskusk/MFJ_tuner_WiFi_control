@@ -18,7 +18,7 @@ constexpr uint8_t PIN_L_DN = D6;      // GPIO12
 
 constexpr uint8_t PIN_ANT  = D8;      // GPIO15
 
-constexpr uint8_t PIN_TUNE = D4;      // GPIO2
+constexpr uint8_t PIN_TUNE = D3;      // GPIO0
 
 constexpr uint8_t PIN_LED1 = D0;      // GPIO16
 constexpr uint8_t PIN_LED2 = D7;      // GPIO13

@@ -18,9 +18,30 @@ body {
 .header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 25px;
     font-size: 14px;
+}
+
+.settings-btn {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.settings-panel {
+    display: none;
+    margin-bottom: 20px;
+}
+
+.settings-panel.show {
+    display: block;
+}
+
+.settings-action {
+    width: 100%;
+    margin-top: 8px;
 }
 
 .grid {
@@ -47,12 +68,14 @@ button {
 }
 
 .tune {
+	margin-top: 30px;
     grid-column: span 2;
     background: #0d47a1;
     font-weight: bold;
 }
 
 .ant-btn {
+	margin-bottom: 30px;
     grid-column: span 2;
     background: #1976d2;
     color: white;
@@ -69,7 +92,22 @@ button {
     font-weight: bold;
 }
 
-.led-on {
+.led-row {
+    grid-column: 1 / -1;
+
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+
+    gap: 12px;
+
+    margin-bottom: 30px;
+}
+
+.led-tuning-on {
+    background: #d32f2f;
+}
+
+.led-swr-on {
     background: #2e7d32;
 }
 
@@ -79,5 +117,62 @@ button {
 
 .footer {
     margin-top: 20px;
-    text-align: center;
+
+    display: flex;
+    flex-wrap: wrap;
+
+    justify-content: center;
+
+    gap: 15px;
+}
+
+.settings-icon {
+
+    width: auto;
+
+    padding: 0;
+
+    margin: 0;
+
+    border: none;
+
+    background: transparent;
+
+    color: white;
+
+    font-size: 18px;
+
+    line-height: 1;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+}
+
+.settings-panel {
+
+    display: none;
+
+    margin-bottom: 20px;
+
+    grid-template-columns:
+        repeat(4, 1fr);
+
+    gap: 10px;
+}
+
+.settings-panel.show {
+
+    display: grid;
+}
+
+.settings-action {
+
+    width: 100%;
+
+    background: #404040;
+
+    color: white;
 }

@@ -43,6 +43,12 @@ private:
     void handleAnt();
     void handleTune();
 
+	void handleWifiPortal();
+	void handleReboot();
+	void handleFwUpdate();
+	void handleWebUpdate();
+	void handleFwUpdatePage();
+
     void handleNotFound();
 
     void onWebSocketEvent(

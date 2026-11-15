@@ -2,6 +2,8 @@
 #include "LedController.h"
 #include <LittleFS.h>
 #include <ESP8266WiFi.h>
+#include <EEPROM.h>
+#include <WiFiManager.h>
 
 #include "TunerController.h"
 #include "WebGui.h"
@@ -10,59 +12,92 @@
 const int LED_PIN = LED_BUILTIN;
 
 LedController led;
+
 TunerController controller;
 WebGui webGui(controller);
+
+WiFiManager wm;
 
 String wifiSsid;
 String wifiPassword;
 
-const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 0; // 1 * 60 * 60;
 const int   daylightOffset_sec = 0; // 3600;
 
 bool wifiConnected = false;
 bool timeObtained = false;
 
+bool wifiPortalRunning = false;
+
+struct WifiCredentials
+{
+    uint32_t magic;
+    
+    char ssid[32];
+    char password[64];
+};
+
+constexpr uint32_t WIFI_MAGIC = 0x4D464A31;
+
+static_assert(sizeof(WifiCredentials) < 128, "WifiCredentials too large");
+
 bool loadCredentials()
 {
-    File f = LittleFS.open("/config.txt", "r");
-    if (!f)
-	{
-        return false;
-	}
+    WifiCredentials cfg;
 
-    while (f.available())
+    EEPROM.get(
+        0,
+        cfg
+    );
+
+    if (cfg.magic != WIFI_MAGIC)
     {
-        String line = f.readStringUntil('\n');
-        line.trim();
-
-        if (line.startsWith("SSID="))
-            wifiSsid = line.substring(5);
-
-        if (line.startsWith("PASSWORD="))
-            wifiPassword = line.substring(9);
+        return false;
     }
 
-    f.close();
+    wifiSsid =
+        String(cfg.ssid);
+
+    wifiPassword =
+        String(cfg.password);
+
     return true;
 }
 
 bool saveCredentials(const String& ssid, const String& password)
 {
-    File f = LittleFS.open("/config.txt", "w");
-    if (!f)
-        return false;
+    WifiCredentials cfg {};
+ 
+   cfg.magic = WIFI_MAGIC;     
 
-    f.println("SSID=" + ssid);
-    f.println("PASSWORD=" + password);
+    Serial.print("Saving SSID: ");
+    Serial.println(ssid);    
 
-    f.close();
+    strncpy(
+        cfg.ssid,
+        ssid.c_str(),
+        sizeof(cfg.ssid) - 1
+    );
+
+    strncpy(
+        cfg.password,
+        password.c_str(),
+        sizeof(cfg.password) - 1
+    );
+
+    EEPROM.put(
+        0,
+        cfg
+    );
+
+    EEPROM.commit();
 
     wifiSsid = ssid;
     wifiPassword = password;
 
     return true;
 }
+
 
 String removeSpecialCharacters(String s)
 {
@@ -111,83 +146,120 @@ void commandNewCreditials()
         Serial.println("Save failed!");
     }
 
+    Serial.println("Restarting...");    
+
     delay(1000);
     ESP.restart();
 }
 
-bool printLocalTime()
-{
-    struct tm timeinfo;
-
-    if (!getLocalTime(&timeinfo))
-    {
-        Serial.println("Failed to obtain time");
-        return false;
-    }
-
-    char buffer[64];
-
-    strftime(
-        buffer,
-        sizeof(buffer),
-        "%A, %d.%m.%Y %H:%M:%S",
-        &timeinfo
-    );
-
-    Serial.println(buffer);
-
-    return true;
-}
-
 bool timeInit(int maxTryNr = 5)
 {
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    configTime(gmtOffset_sec, daylightOffset_sec, NTP_SERVER_1, NTP_SERVER_2);
     setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1);
     tzset();
     for (int tryNr = 0; tryNr < maxTryNr; tryNr++) {
-        yield();
-        if (printLocalTime())
+        delay(100);
+        if (timeValid())
+        {
+            Serial.println(getFormattedDateTime());
             return true;
+        }
     }
     Serial.println("The maximum number of attempts to get time has been reached");
     return false;
 }
 
+void startWifiPortal()
+{
+        Serial.println("Starting WiFi portal...");
+
+		wm.setHostname("MFJ-Tuner-Control");
+
+		wm.setConfigPortalTimeout(300);
+		
+		led.repeatBlink(50, 50, 50, 1000);
+
+		wm.setConfigPortalBlocking(
+			false
+		);
+
+		wifiPortalRunning = true;
+
+		wm.startConfigPortal("MFJ-Tuner-Setup");
+}
+
+
 void checkWifiStateAndReconnectItIfDown(unsigned long currentMillis, uint32_t interval = 10000)
 {
     static volatile unsigned long wifiReconnectionStartTime = 0;
     static volatile unsigned long obtainLocalTimeStartTime = 0;
+    static uint8_t reconnectAttempts = 0;
+    
     // if WiFi is down, try reconnecting
     if ((WiFi.status() != WL_CONNECTED) && (currentMillis - wifiReconnectionStartTime >= interval))
     {
         wifiConnected = false;
+        
         led.repeatBlink(100, 100);
-        Serial.println("Reconnecting to WiFi...");
+        
+        Serial.print("Reconnecting to WiFi... ");
+        
         WiFi.disconnect();
-        WiFi.reconnect();
+        delay(100);
+
+		WiFi.begin(
+			wifiSsid.c_str(),
+			wifiPassword.c_str()
+		);
+        
+        reconnectAttempts++;
+
+        Serial.print(
+            "Reconnect attempt: "
+        );
+        
+        Serial.println(
+            reconnectAttempts
+        );
+               
         wifiReconnectionStartTime = currentMillis;
     }
+    
+    if (reconnectAttempts >= 10)
+    {
+        reconnectAttempts = 0;
+    
+        startWifiPortal();
+    }    
     // WiFi connected, check time and if is correct calculate new feeding times
     if (WiFi.status() == WL_CONNECTED && wifiConnected == false)
     {
+        reconnectAttempts = 0;    
         wifiConnected = true;
         // Init and get the time
         Serial.println("Get new time info...");
         timeObtained = timeInit();
-        // start camera server
-        // TODO startWeberver();
+        Serial.println();
+        Serial.println("WiFi connected");
+        Serial.print("IP: ");
+        Serial.println(WiFi.localIP());
+    
         if (timeObtained == true)
         {
-            led.repeatBlink(50, 1500);
+            led.repeatBlink(50, 2000);
         }
     }
     // WiFi connected, but time failed to obtain from NTP
     if (WiFi.status() == WL_CONNECTED && timeObtained == false && (currentMillis - obtainLocalTimeStartTime >= interval))
     {
-        timeObtained = printLocalTime();
-        if (timeObtained == true)
+        Serial.println(getFormattedDateTime());
+        if (timeValid())
         {
-            led.repeatBlink(50, 1500);
+            timeObtained = true;
+        
+            Serial.println(getFormattedDateTime());
+        
+            led.repeatBlink(50, 2000);
         }
         else
         {
@@ -259,12 +331,8 @@ void checkSerialCommand(String received)
 
 void wifiCreditialsInit()
 {
-    if (!LittleFS.begin())
-    {
-        Serial.println("LittleFS mount failed");
-        return;
-    }
-
+    Serial.println("Loading credentials from EEPROM");
+    
     if (!loadCredentials())
     {
         Serial.println("No stored credentials");
@@ -288,12 +356,13 @@ void serialInit()
 
 bool wifiInit(unsigned long connectingStartingTime, uint32_t timeoutMs = 10000)
 {
-	WiFi.hostname("MFJ-Tuner-Control");
+    WiFi.hostname("MFJ-Tuner-Control");
 
-	if (wifiSsid.length() == 0)
+    if (wifiSsid.length() == 0)
     {
-        Serial.println("SSID not configured");
-        return false;
+		Serial.println("No WiFi credentials stored");
+		startWifiPortal();
+		return false;
     }
 
     WiFi.begin(
@@ -312,64 +381,104 @@ bool wifiInit(unsigned long connectingStartingTime, uint32_t timeoutMs = 10000)
 
     if (WiFi.status() == WL_CONNECTED)
     {
-        Serial.println();
-        Serial.println("WiFi connected");
-        Serial.print("IP: ");
-        Serial.println(WiFi.localIP());
-
         return true;
     }
 
     WiFi.disconnect();
 
-    Serial.println();
-    Serial.println("WiFi connection timeout");
+	Serial.println();
+	Serial.println("WiFi connection timeout");
 
-    return false;
+	startWifiPortal();
+
+	return false;
 }
 
 void setup()
 {
-	led.init(LED_PIN, true);
+    led.init(LED_PIN, true);
 
     // Indicate that MCU is initializing
     led.on();
 
-	// initialize serial port for debug
+    // initialize serial port for debug
     serialInit();
+ 
+     EEPROM.begin(sizeof(WifiCredentials));     
 
-	// initialize WiFi connection
-	wifiCreditialsInit();
-	wifiConnected = wifiInit(millis(), 15000);
+    if (!LittleFS.begin())
+    {
+        Serial.println(
+            "LittleFS mount failed"
+        );
+    }    
+
+    // initialize WiFi connection
+    wifiCreditialsInit();
+    wifiConnected = wifiInit(millis(), 15000);
 
     if (wifiConnected) {
         // Init and get the time
         timeObtained = timeInit();
-        // start camera server
-        //startWebServer();
+        Serial.println();
+        Serial.println("WiFi connected");
+        Serial.print("IP: ");
+        Serial.println(WiFi.localIP());
+
+		led.repeatBlink(50, 2000);
     }
 
-	controller.begin();
-	webGui.begin();
-
-
-	led.repeatBlink(50, 2000);
+    controller.begin();
+    webGui.begin();
+ 
 }
 
 void loop()
 {
-	unsigned long time = millis();
+    unsigned long time = millis();
 
-	led.process(time);
-	// if WiFi is down, try reconnecting
-	if (wifiSsid.length() > 0)
-    {
-    	checkWifiStateAndReconnectItIfDown(time);
+    led.process(time);
+
+	if (wifiPortalRunning)
+	{
+		wm.process();
+
+		if (WiFi.status() == WL_CONNECTED)
+		{
+			saveCredentials(
+				WiFi.SSID(),
+				WiFi.psk()
+			);
+
+			Serial.println("New creditials from portal saved");
+			Serial.println();
+			Serial.println("WiFi connected");
+			Serial.print("IP: ");
+			Serial.println(WiFi.localIP());
+
+			wifiPortalRunning = false;
+
+			wifiConnected = true;
+
+			timeObtained =
+				timeInit();
+
+			led.repeatBlink(
+				50,
+				2000
+			);
+		}
 	}
 
-	if (Serial.available() == true)
+    // if WiFi is down, try reconnecting
+    if (wifiSsid.length() > 0)
+    {
+        checkWifiStateAndReconnectItIfDown(time);
+    }
+
+    if (Serial.available() == true)
         checkSerialCommand(Serial.readString());
 
-	controller.process();
+    controller.process();
     webGui.process();
 }

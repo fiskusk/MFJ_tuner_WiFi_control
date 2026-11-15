@@ -2,33 +2,121 @@
 <html lang="cs">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport"
+          content="width=device-width,initial-scale=1">
+
     <title>MFJ Tuner Control</title>
+
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <div class="container">
+
     <div class="header">
+
         <div id="ssid">SSID</div>
-        <div id="ip">IP</div>
-        <div id="clock">--:--:--</div>
+
+		<div id="ip">IP</div>
+
+		<div id="rssi">RSSI</div>
+
+		<div id="clock">--:--:--</div>
+
+		<div id="uptime">0 s</div>
+
+		<button id="settingsBtn" class="settings-icon">
+			&#9881;
+		</button>
+
     </div>
+
+	<div id="settingsPanel"
+		class="settings-panel">
+
+		<button id="wifiPortalBtn"
+				class="settings-action">
+			📶 WiFi
+		</button>
+
+		<button id="rebootBtn"
+				class="settings-action">
+			🔄 Reboot
+		</button>
+
+		<button id="fwUpdateBtn"
+        		class="settings-action">
+			⬆ FW Update
+		</button>
+
+		<button id="webUpdateBtn"
+				class="settings-action">
+			🌍 Web Update
+		</button>
+
+	</div>
 
     <div class="grid">
-        <button id="cup" class="cmd-btn">C UP</button>
-        <button id="lup" class="cmd-btn">L UP</button>
-        <button id="tune" class="cmd-btn tune">TUNE</button>
-        <button id="ant" class="ant-btn">ANT1</button>
-        <div id="led1" class="led led-off">LED1</div>
-        <button id="cdown" class="cmd-btn">C DN</button>
-        <button id="ldown" class="cmd-btn">L DN</button>
-        <div id="led2" class="led led-off">LED2</div>
-    </div>
+
+		<button id="ant" class="ant-btn">
+			ANT1
+		</button>
+
+		<div class="led-row">
+
+			<div id="led1" class="led led-off">
+				TUNING
+			</div>
+
+			<div id="led2" class="led led-off">
+				SWR
+			</div>
+
+		</div>
+
+		<button id="cup" class="cmd-btn">
+			C UP
+		</button>
+
+		<button id="lup" class="cmd-btn">
+			L UP
+		</button>
+
+		<button id="cdown" class="cmd-btn">
+			C DN
+		</button>
+
+		<button id="ldown" class="cmd-btn">
+			L DN
+		</button>
+
+		<button id="tune" class="cmd-btn tune">
+			TUNE
+		</button>
+
+	</div>
 
     <div class="footer">
-        Queue: <span id="queue">0</span>
-    </div>
+
+		Git Version:
+		<span id="gitversion">---</span>
+
+		|
+
+		Build:
+		<span id="builddate">---</span>
+
+		|
+
+		Queue:
+		<span id="queue">0</span>
+
+	</div>
+
 </div>
+
 <script src="app.js"></script>
+
 </body>
 </html>
+
