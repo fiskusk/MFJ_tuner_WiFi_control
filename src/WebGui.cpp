@@ -56,7 +56,9 @@ void WebGui::process()
 
 void WebGui::broadcastStatus()
 {
-    websocket.broadcastTXT(createStatusJson());
+	String json = createStatusJson();
+
+    websocket.broadcastTXT(json);
 }
 
 String WebGui::createStatusJson()
@@ -141,14 +143,22 @@ void WebGui::onWebSocketEvent(uint8_t clientNum, WStype_t type, uint8_t* payload
     switch (type)
     {
         case WStype_CONNECTED:
-            websocket.sendTXT(clientNum, createStatusJson());
+		{
+            String json = createStatusJson();
+
+			websocket.sendTXT(clientNum, json);
             break;
+		}
 
         case WStype_TEXT:
         {
-            String msg((char*)payload, length);
+            String msg((char*)payload);
             if (msg == "status")
-                websocket.sendTXT(clientNum, createStatusJson());
+			{
+				String json = createStatusJson();
+
+				websocket.sendTXT(clientNum, json);
+			}
             break;
         }
 
