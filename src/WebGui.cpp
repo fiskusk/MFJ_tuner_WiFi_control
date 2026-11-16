@@ -1,23 +1,22 @@
 #include "WebGui.h"
 
 #include <ArduinoJson.h>
-#include <LittleFS.h>
 #include <ESP8266WiFi.h>
+#include <LittleFS.h>
 #include <Updater.h>
 
-#include "TimeUtils.h"
 #include "LedController.h"
+#include "TimeUtils.h"
 
 #ifndef GIT_VERSION
 #define GIT_VERSION "unknown"
 #endif
 
-WebGui* WebGui::instance = nullptr;
+WebGui *WebGui::instance = nullptr;
 
 extern LedController led;
 
-WebGui::WebGui(TunerController& controller)
-    : tuner(controller)
+WebGui::WebGui(TunerController &controller) : tuner(controller)
 {
 }
 
@@ -37,17 +36,111 @@ void WebGui::begin()
     server.on("/style.css", HTTP_GET, [this]() { handleFileRequest("/style.css"); });
     server.on("/app.js", HTTP_GET, [this]() { handleFileRequest("/app.js"); });
     server.onNotFound([this]() { handleNotFound(); });
-	server.on("/api/wifiportal", HTTP_POST, [this]() { handleWifiPortal(); });
-	server.on("/api/reboot", HTTP_POST, [this]() { handleReboot(); });
-	server.on("/api/fwupdate", HTTP_POST, [this]() {handleFwUpdate();} );
-	server.on("/api/webupdate", HTTP_POST, [this]() {handleWebUpdate(); });
-	server.on("/fwupdate", HTTP_GET, [this]() { handleFwUpdatePage(); });
-	server.on("/update", HTTP_POST,[this]()
-    {
-        server.send(
-			200,
-			"text/html",
-			R"(
+    server.on("/api/wifiportal", HTTP_POST, [this]() { handleWifiPortal(); });
+    server.on("/api/reboot", HTTP_POST, [this]() { handleReboot(); });
+    server.on("/api/fwupdate", HTTP_POST, [this]() { handleFwUpdate(); });
+    server.on("/fwupdate", HTTP_GET, [this]() { handleFwUpdatePage(); });
+    server.on("/webupdate", HTTP_GET, [this]() { handleWebUpdatePage(); });
+    server.on(
+        "/webupload", HTTP_POST, [this]() { server.send(200, "text/plain", "OK"); },
+        [this]()
+        {
+            static File uploadFile;
+            static uint32_t processedFiles = 0;
+            static uint32_t expectedFiles = 0;
+
+            HTTPUpload &upload = server.upload();
+
+            if (upload.status == UPLOAD_FILE_START)
+            {
+                String filename = upload.filename;
+
+                if (expectedFiles == 0)
+                {
+                    processedFiles = 0;
+                }
+
+                if (expectedFiles == 0)
+                {
+                    if (server.hasArg("count"))
+                    {
+                        expectedFiles = server.arg("count").toInt();
+
+                        Serial.print("Expected files: ");
+
+                        Serial.println(expectedFiles);
+                    }
+                }
+
+                Serial.print("WEB upload: ");
+
+                Serial.println(filename);
+
+                if (filename != "index.html" && filename != "style.css" && filename != "app.js")
+                {
+                    Serial.println("Invalid file");
+                    return;
+                }
+
+                uploadFile = LittleFS.open("/" + filename, "w");
+                if (!uploadFile)
+                {
+                    Serial.println("OPEN FAILED");
+
+                    return;
+                }
+            }
+
+            else if (upload.status == UPLOAD_FILE_WRITE)
+            {
+                if (uploadFile)
+                {
+                    uploadFile.write(upload.buf, upload.currentSize);
+                }
+            }
+
+            else if (upload.status == UPLOAD_FILE_END)
+            {
+                if (uploadFile)
+                {
+                    uploadFile.close();
+                    processedFiles++;
+                    Serial.print("Processed files: ");
+
+                    Serial.print(processedFiles);
+
+                    Serial.print("/");
+
+                    Serial.println(expectedFiles);
+                }
+
+                Serial.println("WEB update success");
+
+                if (processedFiles >= expectedFiles)
+                {
+                    Serial.println("Restarting after web update");
+
+                    processedFiles = 0;
+                    expectedFiles = 0;
+					
+					if (!uploadFile)
+					{
+						LittleFS.end();
+					}
+
+                    delay(1000);
+					
+                    ESP.restart();
+                }
+            }
+        });
+
+    server.on(
+        "/update", HTTP_POST,
+        [this]()
+        {
+            server.send(200, "text/html",
+                        R"(
 		<!DOCTYPE html>
 		<html>
 		<head>
@@ -79,6 +172,28 @@ void WebGui::begin()
 		.card {
 
 			text-align:center;
+		}
+
+		.progress {
+
+			width: 100%;
+
+			height: 25px;
+
+			background: #555;
+
+			border-radius: 10px;
+
+			overflow: hidden;
+		}
+
+		.progress-bar {
+
+			width: 0%;
+
+			height: 100%;
+
+			background: #2e7d32;
 		}
 
 		</style>
@@ -135,73 +250,71 @@ void WebGui::begin()
 
 		</body>
 		</html>
-		)"
-		);
+		)");
 
-        delay(1000);
+            delay(1000);
 
-        ESP.restart();
-    },
-    [this]()
-    {
-        HTTPUpload& upload = server.upload();
-
-        if (upload.status == UPLOAD_FILE_START)
+            ESP.restart();
+        },
+        [this]()
         {
-            String filename = upload.filename;
+            HTTPUpload &upload = server.upload();
 
-            Serial.print( "Upload start: " );
-
-            Serial.println(filename);
-
-            // kontrola přípony
-
-            if (!filename.endsWith(".bin"))
+            if (upload.status == UPLOAD_FILE_START)
             {
-                // Update.abort();
-                return;
-            }
+                String filename = upload.filename;
 
-            if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000))
-            {
-                Update.printError(Serial);
-            }
-        }
-		else if (upload.status == UPLOAD_FILE_WRITE)
-        {
-            // první blok
-            // kontrola ESP8266 firmware
+                Serial.print("Upload start: ");
 
-            if (upload.totalSize == 0 &&  upload.currentSize > 0)
-            {
-                if (upload.buf[0] != 0xE9)
+                Serial.println(filename);
+
+                // kontrola přípony
+
+                if (!filename.endsWith(".bin"))
                 {
-                    Serial.println( "Not ESP firmware" );
-
                     // Update.abort();
-
                     return;
                 }
-            }
 
-            if ( Update.write(upload.buf, upload.currentSize) != upload.currentSize)
-            {
-                Update.printError(Serial);
+                if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000))
+                {
+                    Update.printError(Serial);
+                }
             }
-        }
-		else if ( upload.status == UPLOAD_FILE_END)
-        {
-            if (Update.end(true))
+            else if (upload.status == UPLOAD_FILE_WRITE)
             {
-                Serial.println("Update success");
-            }
-            else
-            {
-                Update.printError(Serial);
-            }
-        }
-    });
+                // první blok
+                // kontrola ESP8266 firmware
 
+                if (upload.totalSize == 0 && upload.currentSize > 0)
+                {
+                    if (upload.buf[0] != 0xE9)
+                    {
+                        Serial.println("Not ESP firmware");
+
+                        // Update.abort();
+
+                        return;
+                    }
+                }
+
+                if (Update.write(upload.buf, upload.currentSize) != upload.currentSize)
+                {
+                    Update.printError(Serial);
+                }
+            }
+            else if (upload.status == UPLOAD_FILE_END)
+            {
+                if (Update.end(true))
+                {
+                    Serial.println("Update success");
+                }
+                else
+                {
+                    Update.printError(Serial);
+                }
+            }
+        });
 
     server.begin();
 
@@ -246,10 +359,10 @@ String WebGui::createStatusJson()
     doc["ssid"] = WiFi.SSID();
     doc["ip"] = WiFi.localIP().toString();
     doc["rssi"] = WiFi.RSSI();
-    doc["uptime"] = millis() / 1000;  
+    doc["uptime"] = millis() / 1000;
     doc["time"] = getFormattedTime();
-	doc["version"] = GIT_VERSION;
-	doc["build"] = __DATE__ " " __TIME__;
+    doc["version"] = GIT_VERSION;
+    doc["build"] = __DATE__ " " __TIME__;
 
     String json;
     serializeJson(doc, json);
@@ -271,18 +384,21 @@ void WebGui::checkStatusChanges()
     }
 }
 
-void WebGui::handleRoot(){ handleFileRequest("/index.html"); }
+void WebGui::handleRoot()
+{
+    handleFileRequest("/index.html");
+}
 
 void WebGui::handleStatus()
 {
     server.send(200, "application/json", createStatusJson());
 }
 
-static bool enqueueOrReply(TunerController& tuner, ESP8266WebServer& server, CommandType cmd)
+static bool enqueueOrReply(TunerController &tuner, ESP8266WebServer &server, CommandType cmd)
 {
     if (!tuner.enqueue(cmd))
     {
-		led.blink(50, 50, 50);
+        led.blink(50, 50, 50);
         server.send(429, "text/plain", "Too Many Requests");
         return false;
     }
@@ -291,119 +407,335 @@ static bool enqueueOrReply(TunerController& tuner, ESP8266WebServer& server, Com
 
 void WebGui::handleCup()
 {
-    if (!enqueueOrReply(tuner,server, CommandType::C_UP))
+    if (!enqueueOrReply(tuner, server, CommandType::C_UP))
     {
         return;
     }
 
     led.blink(50);
 
-    server.send(
-        200,
-        "text/plain",
-        "OK"
-    );
+    server.send(200, "text/plain", "OK");
 }
 
 void WebGui::handleCdown()
 {
-    if (!enqueueOrReply(tuner,server, CommandType::C_DN))
+    if (!enqueueOrReply(tuner, server, CommandType::C_DN))
     {
         return;
     }
 
     led.blink(50);
 
-    server.send(
-        200,
-        "text/plain",
-        "OK"
-    );
+    server.send(200, "text/plain", "OK");
 }
 
 void WebGui::handleLup()
 {
-    if (!enqueueOrReply(tuner,server, CommandType::L_UP))
+    if (!enqueueOrReply(tuner, server, CommandType::L_UP))
     {
         return;
     }
 
     led.blink(50);
 
-    server.send(
-        200,
-        "text/plain",
-        "OK"
-    );
+    server.send(200, "text/plain", "OK");
 }
 
 void WebGui::handleLdown()
 {
-    if (!enqueueOrReply(tuner,server, CommandType::L_DN))
+    if (!enqueueOrReply(tuner, server, CommandType::L_DN))
     {
         return;
     }
 
     led.blink(50);
 
-    server.send(
-        200,
-        "text/plain",
-        "OK"
-    );
+    server.send(200, "text/plain", "OK");
 }
 
 void WebGui::handleAnt()
 {
-    if (!enqueueOrReply(tuner,server, CommandType::ANT_TOGGLE))
+    if (!enqueueOrReply(tuner, server, CommandType::ANT_TOGGLE))
     {
         return;
     }
 
     led.blink(50);
 
-    server.send(
-        200,
-        "text/plain",
-        "OK"
-    );
+    server.send(200, "text/plain", "OK");
 }
 
 void WebGui::handleTune()
 {
-    if (!enqueueOrReply(tuner,server, CommandType::TUNE))
+    if (!enqueueOrReply(tuner, server, CommandType::TUNE))
     {
         return;
     }
 
     led.blink(50);
 
-    server.send(
-        200,
-        "text/plain",
-        "OK"
-    );
+    server.send(200, "text/plain", "OK");
 }
 
 void WebGui::handleReboot()
 {
-    server.send(
-		200,
-		"application/json",
-		"{\"status\":\"rebooting\"}"
-	);
+    server.send(200, "application/json", "{\"status\":\"rebooting\"}");
 
-	delay(500);
+    delay(500);
 
-	ESP.restart();
+    ESP.restart();
+}
+
+void WebGui::handleWebUpdatePage()
+{
+    server.send(200, "text/html",
+                R"(
+	<!DOCTYPE html>
+	<html lang="cs">
+
+	<head>
+
+	<meta charset="utf-8">
+
+	<meta name="viewport"
+		content="width=device-width,initial-scale=1">
+
+	<title>Web Update</title>
+
+	<style>
+
+	body {
+		margin: 0;
+		background: #121212;
+		color: white;
+		font-family: Arial, sans-serif;
+	}
+
+	.container {
+		max-width: 700px;
+		margin: auto;
+		padding: 30px;
+	}
+
+	h2 {
+		text-align: center;
+	}
+
+	.card {
+
+		background: #303030;
+
+		border-radius: 10px;
+
+		padding: 20px;
+
+		text-align: center;
+	}
+	
+	.card form {
+
+		display: flex;
+
+		flex-direction: column;
+
+		align-items: center;
+
+		gap: 15px;
+	}
+
+	input[type=file] {
+
+		max-width: 350px;
+	}
+
+	input[type=submit] {
+
+		width: auto;
+
+		min-width: 180px;
+
+		font-size: 18px;
+
+		padding: 15px 25px;
+
+		border: none;
+
+		border-radius: 10px;
+
+		background: #1976d2;
+
+		color: white;
+
+		cursor: pointer;
+	}
+
+	.upload-btn {
+
+		min-width: 180px;
+
+		font-size: 18px;
+
+		padding: 15px 25px;
+
+		border: none;
+
+		border-radius: 10px;
+
+		background: #1976d2;
+
+		color: white;
+
+		cursor: pointer;
+	}
+
+	.upload-btn:hover {
+
+		background: #1565c0;
+	}
+
+	</style>
+
+	</head>
+
+	<body>
+
+	<div class="container">
+
+	<h2>Web Update</h2>
+
+	<div class="card">
+
+	<input
+		type="file"
+		id="webFile"
+		accept=".html,.css,.js"
+		multiple>
+
+	<br>
+
+	<button id="uploadBtn"
+			class="upload-btn">
+		Upload Web File
+	</button>
+
+	<br><br>
+
+	<div class="progress">
+
+		<div
+			id="progressBar"
+			class="progress-bar">
+		</div>
+
+	</div>
+
+	<br>
+
+	<div id="progressText">
+
+		0 %
+
+	</div>
+
+	<br>
+
+	<div id="statusText">
+
+		Waiting...
+
+	</div>
+
+	<script>
+
+	document
+		.getElementById("uploadBtn").addEventListener("click", function ()
+	{
+		const fileInput = document.getElementById("webFile");
+
+		document.getElementById("statusText").innerText = fileInput.files.length + " files selected";
+
+		if (fileInput.files.length === 0)
+		{
+			alert("Select index.html, style.css or app.js first.");
+			return;
+		}
+
+		const formData = new FormData();
+
+		for (let i = 0; i < fileInput.files.length; i++)
+		{
+			formData.append("update", fileInput.files[i]);
+		}
+
+		formData.append("fileCount", fileInput.files.length);
+
+		const xhr =	new XMLHttpRequest();
+
+		xhr.upload.addEventListener("progress", function(event)
+		{
+			if (event.lengthComputable)
+			{
+				const percent = Math.round((event.loaded / event.total) * 100);
+
+				document.getElementById("progressBar").style.width = percent + "%";
+
+				document.getElementById("progressText").innerText = percent + "%";
+
+				document.getElementById("statusText").innerText = "Uploading filesystem...";
+			}
+		});
+
+		xhr.onload = function()
+		{
+			document.getElementById("statusText").innerText = "Filesystem uploaded. Rebooting...";
+
+			waitForReconnect();
+		};
+
+		xhr.open("POST", "/webupload?count=" + fileInput.files.length, true);
+
+		xhr.send(formData);
+	});
+
+	function waitForReconnect()
+	{
+		const timer = setInterval(async () =>
+		{
+			try
+			{
+				const response = await fetch("/api/status");
+
+				if (response.ok)
+				{
+					clearInterval(timer);
+					location.href ="/";
+				}
+			}
+			catch(e)
+			{
+			}
+
+		}, 2000);
+	}
+
+	</script>
+
+	</form>
+
+	</div>
+
+	</div>
+
+	</body>
+
+	</html>
+	)");
 }
 
 void WebGui::handleFwUpdatePage()
 {
-    server.send(
-		200,
-		"text/html",
-		R"(
+    server.send(200, "text/html",
+                R"(
 	<!DOCTYPE html>
 	<html lang="cs">
 
@@ -483,6 +815,30 @@ void WebGui::handleFwUpdatePage()
 		cursor: pointer;
 	}
 
+	.upload-btn {
+
+		min-width: 180px;
+
+		font-size: 18px;
+
+		padding: 15px 25px;
+
+		border: none;
+
+		border-radius: 10px;
+
+		background: #1976d2;
+
+		color: white;
+
+		cursor: pointer;
+	}
+
+	.upload-btn:hover {
+
+		background: #1565c0;
+	}
+
 	</style>
 
 	</head>
@@ -495,16 +851,179 @@ void WebGui::handleFwUpdatePage()
 
 	<div class="card">
 
-	<form method="POST"
-		action="/update"
-		enctype="multipart/form-data">
+	<input
+		type="file"
+		id="fwFile"
+		accept=".bin">
 
-	<input type="file"
-       name="update"
-       accept=".bin">
+	<br>
 
-	<input type="submit"
-		value="Upload Firmware">
+	<button id="uploadBtn"
+			class="upload-btn">
+		Upload Firmware
+	</button>
+
+	<br><br>
+
+	<div class="progress">
+
+		<div
+			id="progressBar"
+			class="progress-bar">
+		</div>
+
+	</div>
+
+	<br>
+
+	<div id="progressText">
+
+		0 %
+
+	</div>
+
+	<br>
+
+	<div id="statusText">
+
+		Waiting...
+
+	</div>
+
+	<script>
+
+	document
+		.getElementById(
+			"uploadBtn"
+		)
+		.addEventListener(
+			"click",
+			function ()
+	{
+		const fileInput =
+			document.getElementById(
+				"fwFile"
+			);
+
+		if (
+			fileInput.files.length === 0
+		)
+		{
+			alert(
+				"Select firmware first."
+			);
+			return;
+		}
+
+		const file =
+			fileInput.files[0];
+
+		const formData =
+			new FormData();
+
+		formData.append(
+			"update",
+			file
+		);
+
+		const xhr =
+			new XMLHttpRequest();
+
+		xhr.upload.addEventListener(
+			"progress",
+			function(event)
+		{
+			if (
+				event.lengthComputable
+			)
+			{
+				const percent =
+					Math.round(
+						(event.loaded /
+						event.total) *
+						100
+					);
+
+				document
+					.getElementById(
+						"progressBar"
+					)
+					.style.width =
+						percent + "%";
+
+				document
+					.getElementById(
+						"progressText"
+					)
+					.innerText =
+						percent + "%";
+
+				document
+					.getElementById(
+						"statusText"
+					)
+					.innerText =
+						"Uploading firmware...";
+			}
+		});
+
+		xhr.onload =
+			function()
+		{
+			document
+				.getElementById(
+					"statusText"
+				)
+				.innerText =
+					"Firmware uploaded. Rebooting...";
+
+			waitForReconnect();
+		};
+
+		xhr.open(
+			"POST",
+			"/update",
+			true
+		);
+
+		xhr.send(
+			formData
+		);
+	});
+
+	function waitForReconnect()
+	{
+		const timer =
+			setInterval(
+				async () =>
+		{
+			try
+			{
+				const response =
+					await fetch(
+						"/api/status"
+					);
+
+				if (
+					response.ok
+				)
+				{
+					clearInterval(
+						timer
+					);
+
+					location.href =
+						"/";
+				}
+			}
+			catch(e)
+			{
+			}
+
+		}, 2000);
+	}
+
+	</script>
 
 	</form>
 
@@ -515,41 +1034,29 @@ void WebGui::handleFwUpdatePage()
 	</body>
 
 	</html>
-	)"
-	);
+	)");
 }
 
 void WebGui::handleFwUpdate()
 {
-    server.send(
-        200,
-        "text/plain",
-        "Not implemented"
-    );
+    server.send(200, "text/plain", "Not implemented");
 }
 
 void WebGui::handleWebUpdate()
 {
-    server.send(
-        200,
-        "text/plain",
-        "Not implemented"
-    );
+    Serial.println("WEB UPDATE RECEIVED");
+
+    server.send(200, "text/plain", "OK");
 }
 
 void WebGui::handleWifiPortal()
 {
-    server.send(
-        200,
-        "text/plain",
-        "WIFI"
-    );
+    server.send(200, "text/plain", "WIFI");
 
     delay(250);
-
 }
 
-void WebGui::handleFileRequest(const String& path)
+void WebGui::handleFileRequest(const String &path)
 {
     if (!LittleFS.exists(path))
     {
@@ -558,49 +1065,54 @@ void WebGui::handleFileRequest(const String& path)
     }
 
     String contentType = "text/plain";
-    if (path.endsWith(".html")) contentType = "text/html";
-    else if (path.endsWith(".css")) contentType = "text/css";
-    else if (path.endsWith(".js")) contentType = "application/javascript";
+    if (path.endsWith(".html"))
+        contentType = "text/html";
+    else if (path.endsWith(".css"))
+        contentType = "text/css";
+    else if (path.endsWith(".js"))
+        contentType = "application/javascript";
 
     File file = LittleFS.open(path, "r");
     server.streamFile(file, contentType);
     file.close();
 }
 
-void WebGui::handleNotFound(){ server.send(404, "text/plain", "404 Not Found"); }
+void WebGui::handleNotFound()
+{
+    server.send(404, "text/plain", "404 Not Found");
+}
 
-void WebGui::onWebSocketEvent(uint8_t clientNum, WStype_t type, uint8_t* payload, size_t length)
+void WebGui::onWebSocketEvent(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t length)
 {
     switch (type)
     {
-        case WStype_CONNECTED:
+    case WStype_CONNECTED:
+    {
+        String json = createStatusJson();
+
+        websocket.sendTXT(clientNum, json);
+        break;
+    }
+
+    case WStype_TEXT:
+    {
+        String msg((char *)payload);
+        if (msg == "status")
         {
             String json = createStatusJson();
 
             websocket.sendTXT(clientNum, json);
-            break;
         }
+        break;
+    }
 
-        case WStype_TEXT:
-        {
-            String msg((char*)payload);
-            if (msg == "status")
-            {
-                String json = createStatusJson();
-
-                websocket.sendTXT(clientNum, json);
-            }
-            break;
-        }
-
-        default:
-            break;
+    default:
+        break;
     }
 }
 
-void WebGui::webSocketEventBridge(uint8_t clientNum, WStype_t type, uint8_t* payload, size_t length)
+void WebGui::webSocketEventBridge(uint8_t clientNum, WStype_t type, uint8_t *payload, size_t length)
 {
     if (instance != nullptr)
         instance->onWebSocketEvent(clientNum, type, payload, length);
 }
-

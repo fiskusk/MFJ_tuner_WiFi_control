@@ -20,19 +20,11 @@ String getFormattedTime()
 
     struct tm timeinfo;
 
-    localtime_r(
-        &now,
-        &timeinfo
-    );
+    localtime_r(&now, &timeinfo);
 
     char buffer[16];
 
-    strftime(
-        buffer,
-        sizeof(buffer),
-        "%H:%M:%S",
-        &timeinfo
-    );
+    strftime(buffer, sizeof(buffer), "%H:%M:%S", &timeinfo);
 
     return String(buffer);
 }
@@ -48,19 +40,11 @@ String getFormattedDateTime()
 
     struct tm timeinfo;
 
-    localtime_r(
-        &now,
-        &timeinfo
-    );
+    localtime_r(&now, &timeinfo);
 
     char buffer[32];
 
-    strftime(
-        buffer,
-        sizeof(buffer),
-        "%d.%m.%Y %H:%M:%S",
-        &timeinfo
-    );
+    strftime(buffer, sizeof(buffer), "%d.%m.%Y %H:%M:%S", &timeinfo);
 
     return String(buffer);
 }

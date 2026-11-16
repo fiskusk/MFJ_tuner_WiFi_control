@@ -1,83 +1,52 @@
-const antButton =
-    document.getElementById("ant");
+const antButton = document.getElementById("ant");
 
-const led1 =
-    document.getElementById("led1");
+const led1 = document.getElementById("led1");
 
-const led2 =
-    document.getElementById("led2");
+const led2 = document.getElementById("led2");
 
-const queue =
-    document.getElementById("queue");
+const queue = document.getElementById("queue");
 
-const settingsPanel =
-    document.getElementById("settingsPanel");
+const settingsPanel = document.getElementById("settingsPanel");
 
-let currentTime = null;    
+let currentTime = null;
 
-function post(url)
-{
-    fetch(url,
-    {
-        method: "POST"
+function post(url) {
+  fetch(url, {
+    method: "POST",
+  })
+    .then(() => {
+      return fetch("/api/status");
     })
-    .then(() =>
-    {
-        return fetch("/api/status");
-    })
-    .then(r => r.json())
+    .then((r) => r.json())
     .then(updateStatus)
     .catch(console.error);
 }
 
-document
-    .getElementById("cup")
-    .onclick = () => post("/api/cup");
+document.getElementById("cup").onclick = () => post("/api/cup");
 
-document
-    .getElementById("cdown")
-    .onclick = () => post("/api/cdown");
+document.getElementById("cdown").onclick = () => post("/api/cdown");
 
-document
-    .getElementById("lup")
-    .onclick = () => post("/api/lup");
+document.getElementById("lup").onclick = () => post("/api/lup");
 
-document
-    .getElementById("ldown")
-    .onclick = () => post("/api/ldown");
+document.getElementById("ldown").onclick = () => post("/api/ldown");
 
-document
-    .getElementById("tune")
-    .onclick = () => post("/api/tune");
+document.getElementById("tune").onclick = () => post("/api/tune");
 
-document
-    .getElementById("ant")
-    .onclick = () => post("/api/ant");
+document.getElementById("ant").onclick = () => post("/api/ant");
 
-document
-    .getElementById("settingsBtn")
-    .onclick = () =>
-{
-    settingsPanel.classList.toggle(
-        "show"
-    );
+document.getElementById("settingsBtn").onclick = () => {
+  settingsPanel.classList.toggle("show");
 };
 
-document
-    .getElementById("wifiPortalBtn")
-    .onclick = () => post("/api/wifiportal");
+document.getElementById("wifiPortalBtn").onclick = () =>
+  post("/api/wifiportal");
 
-document
-    .getElementById("rebootBtn")
-    .onclick = () =>
-{
-    fetch("/api/reboot",
-    {
-        method: "POST"
-    });
+document.getElementById("rebootBtn").onclick = () => {
+  fetch("/api/reboot", {
+    method: "POST",
+  });
 
-    document.body.innerHTML =
-    `
+  document.body.innerHTML = `
         <div style="
             color:white;
             background:black;
@@ -93,213 +62,135 @@ document
         </div>
     `;
 
-    const waitForEsp =
-        setInterval(async () =>
-    {
-        try
-        {
-            const response =
-                await fetch(
-                    "/api/status"
-                );
+  const waitForEsp = setInterval(async () => {
+    try {
+      const response = await fetch("/api/status");
 
-            if (response.ok)
-            {
-                clearInterval(
-                    waitForEsp
-                );
+      if (response.ok) {
+        clearInterval(waitForEsp);
 
-                location.reload();
-            }
-        }
-        catch(e)
-        {
-        }
-
-    }, 2000);
+        location.reload();
+      }
+    } catch (e) {}
+  }, 2000);
 };
 
-document
-    .getElementById("fwUpdateBtn")
-    .onclick = () =>
-{
-    window.location =
-        "/fwupdate";
+document.getElementById("fwUpdateBtn").onclick = () => {
+  window.location = "/fwupdate";
 };
 
-document
-    .getElementById("webUpdateBtn")
-    .onclick = () =>
-{
-    alert("Web Update not implemented yet");
+document.getElementById("webUpdateBtn").onclick = () => {
+  window.location = "/webupdate";
 };
 
-function updateStatus(data)
-{
-    document.getElementById("ssid").textContent =
-      data.ssid;
+function updateStatus(data) {
+  document.getElementById("ssid").textContent = data.ssid;
 
-    document.getElementById("ip").textContent =
-      data.ip;
+  document.getElementById("ip").textContent = data.ip;
 
-    const rssiElement =
-    document.getElementById("rssi");
+  const rssiElement = document.getElementById("rssi");
 
-    rssiElement.textContent =
-        data.rssi + " dBm";
-    
-    if (data.rssi >= -60)
-    {
-        rssiElement.style.color =
-            "#00ff00";
-    }
-    else if (data.rssi >= -75)
-    {
-        rssiElement.style.color =
-            "#ffcc00";
-    }
-    else
-    {
-        rssiElement.style.color =
-            "#ff4444";
-    }    
+  rssiElement.textContent = data.rssi + " dBm";
 
-    currentTime = data.time;
+  if (data.rssi >= -60) {
+    rssiElement.style.color = "#00ff00";
+  } else if (data.rssi >= -75) {
+    rssiElement.style.color = "#ffcc00";
+  } else {
+    rssiElement.style.color = "#ff4444";
+  }
 
-    document.getElementById("clock").textContent =
-      currentTime;
- 
-    if (data.uptime !== undefined)
-    {
-        const uptimeSeconds = data.uptime;
-    
-        const days = Math.floor(
-            uptimeSeconds / 86400
-        );
-    
-        const hours = Math.floor(
-            (uptimeSeconds % 86400) / 3600
-        );
-    
-        const minutes = Math.floor(
-            (uptimeSeconds % 3600) / 60
-        );
-    
-        document.getElementById("uptime").textContent =
-            `UP: ${days}d ${String(hours).padStart(2,'0')}h ${String(minutes).padStart(2,'0')}m`;
-    }    
-          
-    queue.textContent =
-        data.queue;
+  currentTime = data.time;
 
-	document.getElementById("gitversion").textContent =
-    	data.version;
+  document.getElementById("clock").textContent = currentTime;
 
-	document.getElementById("builddate").textContent =
-		data.build;
+  if (data.uptime !== undefined) {
+    const uptimeSeconds = data.uptime;
 
-    led1.className =
-		data.led1 ?
-		"led led-tuning-on" :
-		"led led-off";
+    const days = Math.floor(uptimeSeconds / 86400);
 
-	led2.className =
-		data.led2 ?
-		"led led-swr-on" :
-		"led led-off";
+    const hours = Math.floor((uptimeSeconds % 86400) / 3600);
 
-    antButton.textContent =
-        data.ant === 2 ?
-        "ANT2" :
-        "ANT1";
+    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
 
-    antButton.className =
-        data.ant === 2 ?
-        "ant-btn ant2" :
-        "ant-btn";
+    document.getElementById("uptime").textContent =
+      `UP: ${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m`;
+  }
+
+  queue.textContent = data.queue;
+
+  document.getElementById("gitversion").textContent = data.version;
+
+  document.getElementById("builddate").textContent = data.build;
+
+  led1.className = data.led1 ? "led led-tuning-on" : "led led-off";
+
+  led2.className = data.led2 ? "led led-swr-on" : "led led-off";
+
+  antButton.textContent = data.ant === 2 ? "ANT2" : "ANT1";
+
+  antButton.className = data.ant === 2 ? "ant-btn ant2" : "ant-btn";
 }
 
-setInterval(() =>
-{
-    if (!currentTime ||
-        currentTime === "--:--:--")
-    {
-        return;
-    }
+setInterval(() => {
+  if (!currentTime || currentTime === "--:--:--") {
+    return;
+  }
 
-    const parts =
-        currentTime.split(":");
+  const parts = currentTime.split(":");
 
-    let h = parseInt(parts[0], 10);
-    let m = parseInt(parts[1], 10);
-    let s = parseInt(parts[2], 10);
+  let h = parseInt(parts[0], 10);
+  let m = parseInt(parts[1], 10);
+  let s = parseInt(parts[2], 10);
 
-    s++;
+  s++;
 
-    if (s >= 60)
-    {
-        s = 0;
-        m++;
-    }
+  if (s >= 60) {
+    s = 0;
+    m++;
+  }
 
-    if (m >= 60)
-    {
-        m = 0;
-        h++;
-    }
+  if (m >= 60) {
+    m = 0;
+    h++;
+  }
 
-    if (h >= 24)
-    {
-        h = 0;
-    }
+  if (h >= 24) {
+    h = 0;
+  }
 
-    currentTime =
-        `${String(h).padStart(2,'0')}:` +
-        `${String(m).padStart(2,'0')}:` +
-        `${String(s).padStart(2,'0')}`;
+  currentTime =
+    `${String(h).padStart(2, "0")}:` +
+    `${String(m).padStart(2, "0")}:` +
+    `${String(s).padStart(2, "0")}`;
 
-    document.getElementById("clock").textContent =
-        currentTime;
-
+  document.getElementById("clock").textContent = currentTime;
 }, 1000);
 
 fetch("/api/status")
-    .then(r => r.json())
-    .then(updateStatus);
+  .then((r) => r.json())
+  .then(updateStatus);
 
-const ws = new WebSocket(
-    `ws://${location.hostname}:81`
-);
+const ws = new WebSocket(`ws://${location.hostname}:81`);
 
-ws.onopen = () =>
-{
-    ws.send("status");
+ws.onopen = () => {
+  ws.send("status");
 };
 
-ws.onmessage = event =>
-{
-    try
-    {
-        const data =
-            JSON.parse(event.data);
+ws.onmessage = (event) => {
+  try {
+    const data = JSON.parse(event.data);
 
-        updateStatus(data);
-    }
-    catch(ex)
-    {
-        console.error(ex);
-    }
+    updateStatus(data);
+  } catch (ex) {
+    console.error(ex);
+  }
 };
 
-document.addEventListener(
-    "visibilitychange",
-    () =>
-    {
-        if (!document.hidden)
-        {
-            fetch("/api/status")
-                .then(r => r.json())
-                .then(updateStatus);
-        }
-    }
-);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then(updateStatus);
+  }
+});

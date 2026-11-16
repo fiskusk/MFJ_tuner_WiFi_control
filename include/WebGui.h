@@ -48,6 +48,7 @@ private:
 	void handleFwUpdate();
 	void handleWebUpdate();
 	void handleFwUpdatePage();
+	void handleWebUpdatePage();
 
     void handleNotFound();
 
