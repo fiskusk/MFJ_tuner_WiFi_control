@@ -33,10 +33,7 @@ void TunerController::begin()
 
     loadConfig();
 
-    digitalWrite(
-        PIN_ANT,
-        ant2State ? HIGH : LOW
-    );
+    digitalWrite(PIN_ANT, ant2State ? !ANT1_SELECT_LEVEL : ANT1_SELECT_LEVEL);
 }
 
 void TunerController::process()
@@ -83,7 +80,7 @@ bool TunerController::enqueueInternal(CommandType cmd)
     return true;
 }
 
-bool TunerController::dequeue(CommandType& cmd)
+bool TunerController::dequeue(CommandType &cmd)
 {
     if (queueCount == 0)
     {
@@ -112,10 +109,7 @@ void TunerController::startPulse(uint8_t pin)
 
     pulseActive = true;
 
-    digitalWrite(
-        activePin,
-        BUTTON_ACTIVE_LEVEL
-    );
+    digitalWrite(activePin, BUTTON_ACTIVE_LEVEL);
 }
 
 void TunerController::processPulse()
@@ -130,10 +124,7 @@ void TunerController::processPulse()
         return;
     }
 
-    digitalWrite(
-        activePin,
-        BUTTON_IDLE_LEVEL
-    );
+    digitalWrite(activePin, BUTTON_IDLE_LEVEL);
 
     pulseActive = false;
 }
@@ -142,36 +133,33 @@ void TunerController::executeCommand(CommandType cmd)
 {
     switch (cmd)
     {
-        case CommandType::C_UP:
-            startPulse(PIN_C_UP);
-            break;
+    case CommandType::C_UP:
+        startPulse(PIN_C_UP);
+        break;
 
-        case CommandType::C_DN:
-            startPulse(PIN_C_DN);
-            break;
+    case CommandType::C_DN:
+        startPulse(PIN_C_DN);
+        break;
 
-        case CommandType::L_UP:
-            startPulse(PIN_L_UP);
-            break;
+    case CommandType::L_UP:
+        startPulse(PIN_L_UP);
+        break;
 
-        case CommandType::L_DN:
-            startPulse(PIN_L_DN);
-            break;
+    case CommandType::L_DN:
+        startPulse(PIN_L_DN);
+        break;
 
-        case CommandType::TUNE:
-            startPulse(PIN_TUNE);
-            break;
+    case CommandType::TUNE:
+        startPulse(PIN_TUNE);
+        break;
 
-        case CommandType::ANT_TOGGLE:
-            ant2State = !ant2State;
+    case CommandType::ANT_TOGGLE:
+        ant2State = !ant2State;
 
-            digitalWrite(
-                PIN_ANT,
-                ant2State ? HIGH : LOW
-            );
+        digitalWrite(PIN_ANT, ant2State ? !ANT1_SELECT_LEVEL : ANT1_SELECT_LEVEL);
 
-            saveConfig();
-            break;
+        saveConfig();
+        break;
     }
 }
 

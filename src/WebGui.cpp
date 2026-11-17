@@ -16,6 +16,8 @@ WebGui *WebGui::instance = nullptr;
 
 extern LedController led;
 
+static bool requestRebootAfterWebUpdate = false;
+
 WebGui::WebGui(TunerController &controller) : tuner(controller)
 {
 }
@@ -123,14 +125,9 @@ void WebGui::begin()
                     processedFiles = 0;
                     expectedFiles = 0;
 					
-					if (!uploadFile)
-					{
-						LittleFS.end();
-					}
+					LittleFS.end();
 
-                    delay(1000);
-					
-                    ESP.restart();
+                    requestRebootAfterWebUpdate = true;
                 }
             }
         });
@@ -338,6 +335,17 @@ void WebGui::process()
         lastStatusBroadcast = millis();
         broadcastStatus();
     }
+
+	if (requestRebootAfterWebUpdate)
+	{
+		requestRebootAfterWebUpdate = false;
+
+		LittleFS.end();
+
+		delay(1000);
+
+		ESP.restart();
+	}
 }
 
 void WebGui::broadcastStatus()
@@ -667,8 +675,6 @@ void WebGui::handleWebUpdatePage()
 			formData.append("update", fileInput.files[i]);
 		}
 
-		formData.append("fileCount", fileInput.files.length);
-
 		const xhr =	new XMLHttpRequest();
 
 		xhr.upload.addEventListener("progress", function(event)
@@ -687,7 +693,22 @@ void WebGui::handleWebUpdatePage()
 
 		xhr.onload = function()
 		{
-			document.getElementById("statusText").innerText = "Filesystem uploaded. Rebooting...";
+			document.body.innerHTML =
+			`
+				<div style="
+					color:white;
+					background:black;
+					height:100vh;
+					display:flex;
+					flex-direction:column;
+					justify-content:center;
+					align-items:center;
+					font-family:Arial;
+				">
+					<h2>Web update uploaded...</h2>
+					<p>Waiting for reconnect</p>
+				</div>
+			`;
 
 			waitForReconnect();
 		};
@@ -967,15 +988,24 @@ void WebGui::handleFwUpdatePage()
 			}
 		});
 
-		xhr.onload =
-			function()
+		xhr.onload = function()
 		{
-			document
-				.getElementById(
-					"statusText"
-				)
-				.innerText =
-					"Firmware uploaded. Rebooting...";
+			document.body.innerHTML =
+			`
+				<div style="
+					color:white;
+					background:black;
+					height:100vh;
+					display:flex;
+					flex-direction:column;
+					justify-content:center;
+					align-items:center;
+					font-family:Arial;
+				">
+					<h2>Firmware uploaded...</h2>
+					<p>Waiting for reconnect</p>
+				</div>
+			`;
 
 			waitForReconnect();
 		};

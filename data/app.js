@@ -9,6 +9,7 @@ const queue = document.getElementById("queue");
 const settingsPanel = document.getElementById("settingsPanel");
 
 let currentTime = null;
+let lastWsMessage = Date.now();
 
 function post(url) {
   fetch(url, {
@@ -171,21 +172,41 @@ fetch("/api/status")
   .then((r) => r.json())
   .then(updateStatus);
 
-const ws = new WebSocket(`ws://${location.hostname}:81`);
+let ws = null;
 
-ws.onopen = () => {
-  ws.send("status");
-};
+function connectWebSocket() {
+  ws = new WebSocket(`ws://${location.hostname}:81`);
 
-ws.onmessage = (event) => {
-  try {
-    const data = JSON.parse(event.data);
+  ws.onopen = () => {
+    console.log("WebSocket connected");
 
-    updateStatus(data);
-  } catch (ex) {
-    console.error(ex);
-  }
-};
+    ws.send("status");
+  };
+
+  ws.onmessage = (event) => {
+    lastWsMessage = Date.now();
+
+    try {
+      const data = JSON.parse(event.data);
+
+      updateStatus(data);
+    } catch (ex) {
+      console.error(ex);
+    }
+  };
+
+  ws.onclose = () => {
+    console.log("WebSocket disconnected");
+
+    setTimeout(connectWebSocket, 2000);
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+}
+
+connectWebSocket();
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
@@ -194,3 +215,13 @@ document.addEventListener("visibilitychange", () => {
       .then(updateStatus);
   }
 });
+
+setInterval(() => {
+  const age = Date.now() - lastWsMessage;
+
+  if (age > 5000) {
+    console.log("WebSocket timeout");
+
+    location.reload();
+  }
+}, 1000);

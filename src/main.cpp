@@ -1,3 +1,5 @@
+// TODO udělat možnost režimu AP, kdy to poběží standalone a něco se může připojit k tomu bez nutnosti externí wifi sítě.
+
 #include <Arduino.h>
 #include "LedController.h"
 #include <LittleFS.h>
