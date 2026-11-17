@@ -10,6 +10,7 @@ const settingsPanel = document.getElementById("settingsPanel");
 
 let currentTime = null;
 let lastWsMessage = Date.now();
+let longPressMs = 500;
 
 function post(url) {
   fetch(url, {
@@ -23,13 +24,105 @@ function post(url) {
     .catch(console.error);
 }
 
-document.getElementById("cup").onclick = () => post("/api/cup");
+const cupButton = document.getElementById("cup");
 
-document.getElementById("cdown").onclick = () => post("/api/cdown");
+cupButton.addEventListener("pointerdown", () => {
+  post("/api/cup/start");
+});
 
-document.getElementById("lup").onclick = () => post("/api/lup");
+cupButton.addEventListener("pointerup", () => {
+  post("/api/cup/stop");
+});
 
-document.getElementById("ldown").onclick = () => post("/api/ldown");
+cupButton.addEventListener("pointerleave", () => {
+  post("/api/cup/stop");
+});
+
+const cdownButton = document.getElementById("cdown");
+
+cdownButton.addEventListener("pointerdown", () => {
+  post("/api/cdown/start");
+});
+
+cdownButton.addEventListener("pointerup", () => {
+  post("/api/cdown/stop");
+});
+
+cdownButton.addEventListener("pointerleave", () => {
+  post("/api/cdown/stop");
+});
+
+const lupButton = document.getElementById("lup");
+
+lupButton.addEventListener("pointerdown", () => {
+  post("/api/lup/start");
+});
+
+lupButton.addEventListener("pointerup", () => {
+  post("/api/lup/stop");
+});
+
+lupButton.addEventListener("pointerleave", () => {
+  post("/api/lup/stop");
+});
+
+const ldownButton = document.getElementById("ldown");
+
+ldownButton.addEventListener("pointerdown", () => {
+  post("/api/ldown/start");
+});
+
+ldownButton.addEventListener("pointerup", () => {
+  post("/api/ldown/stop");
+});
+
+ldownButton.addEventListener("pointerleave", () => {
+  post("/api/ldown/stop");
+});
+
+function setupLongPress(buttonId, shortUrl, startUrl, stopUrl) {
+  const button = document.getElementById(buttonId);
+
+  let pressTimer = null;
+
+  let longPressActive = false;
+
+  button.addEventListener("pointerdown", () => {
+    longPressActive = false;
+
+    pressTimer = setTimeout(() => {
+      longPressActive = true;
+
+      post(startUrl);
+    }, longPressMs);
+  });
+
+  button.addEventListener("pointerup", () => {
+    clearTimeout(pressTimer);
+
+    if (longPressActive) {
+      post(stopUrl);
+    } else {
+      post(shortUrl);
+    }
+  });
+
+  button.addEventListener("pointerleave", () => {
+    clearTimeout(pressTimer);
+
+    if (longPressActive) {
+      post(stopUrl);
+    }
+  });
+}
+
+setupLongPress("cup", "/api/cup", "/api/cup/start", "/api/cup/stop");
+
+setupLongPress("cdown", "/api/cdown", "/api/cdown/start", "/api/cdown/stop");
+
+setupLongPress("lup", "/api/lup", "/api/lup/start", "/api/lup/stop");
+
+setupLongPress("ldown", "/api/ldown", "/api/ldown/start", "/api/ldown/stop");
 
 document.getElementById("tune").onclick = () => post("/api/tune");
 
@@ -85,6 +178,10 @@ document.getElementById("webUpdateBtn").onclick = () => {
 };
 
 function updateStatus(data) {
+  if (data.longPressMs !== undefined) {
+    longPressMs = data.longPressMs;
+  }
+
   document.getElementById("ssid").textContent = data.ssid;
 
   document.getElementById("ip").textContent = data.ip;

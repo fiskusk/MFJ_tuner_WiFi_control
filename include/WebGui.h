@@ -40,6 +40,18 @@ private:
     void handleLup();
     void handleLdown();
 
+	void handleCupStart();
+	void handleCupStop();
+
+	void handleCdownStart();
+	void handleCdownStop();
+
+	void handleLupStart();
+	void handleLupStop();
+
+	void handleLdownStart();
+	void handleLdownStop();
+
     void handleAnt();
     void handleTune();
 

@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <Arduino.h>
 #include "HardwareConfig.h"
+#include <Arduino.h>
 
 enum class CommandType
 {
@@ -19,8 +19,7 @@ enum class CommandType
 
 class TunerController
 {
-public:
-
+  public:
     void begin();
     void process();
 
@@ -33,8 +32,11 @@ public:
 
     uint8_t queuedCommands() const;
 
-private:
+    void startContinuous(CommandType cmd);
 
+    void stopContinuous();
+
+  private:
     CommandType queue[COMMAND_QUEUE_SIZE];
 
     uint8_t queueHead = 0;
@@ -42,11 +44,15 @@ private:
     uint8_t queueCount = 0;
 
     bool enqueueInternal(CommandType cmd);
-    bool dequeue(CommandType& cmd);
+    bool dequeue(CommandType &cmd);
 
     bool pulseActive = false;
     uint8_t activePin = 0;
     uint32_t pulseStartTime = 0;
+
+    bool continuousActive = false;
+
+    uint8_t continuousPin = 0;
 
     void startPulse(uint8_t pin);
     void processPulse();

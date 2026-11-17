@@ -30,9 +30,17 @@ void WebGui::begin()
     server.on("/index.html", HTTP_GET, [this]() { handleFileRequest("/index.html"); });
     server.on("/api/status", HTTP_GET, [this]() { handleStatus(); });
     server.on("/api/cup", HTTP_POST, [this]() { handleCup(); });
+    server.on("/api/cup/start", HTTP_POST, [this]() { handleCupStart(); });
+    server.on("/api/cup/stop", HTTP_POST, [this]() { handleCupStop(); });
     server.on("/api/cdown", HTTP_POST, [this]() { handleCdown(); });
+    server.on("/api/cdown/start", HTTP_POST, [this]() { handleCdownStart(); });
+    server.on("/api/cdown/stop", HTTP_POST, [this]() { handleCdownStop(); });
     server.on("/api/lup", HTTP_POST, [this]() { handleLup(); });
+    server.on("/api/lup/start", HTTP_POST, [this]() { handleLupStart(); });
+    server.on("/api/lup/stop", HTTP_POST, [this]() { handleLupStop(); });
     server.on("/api/ldown", HTTP_POST, [this]() { handleLdown(); });
+    server.on("/api/ldown/start", HTTP_POST, [this]() { handleLdownStart(); });
+    server.on("/api/ldown/stop", HTTP_POST, [this]() { handleLdownStop(); });
     server.on("/api/ant", HTTP_POST, [this]() { handleAnt(); });
     server.on("/api/tune", HTTP_POST, [this]() { handleTune(); });
     server.on("/style.css", HTTP_GET, [this]() { handleFileRequest("/style.css"); });
@@ -124,8 +132,8 @@ void WebGui::begin()
 
                     processedFiles = 0;
                     expectedFiles = 0;
-					
-					LittleFS.end();
+
+                    LittleFS.end();
 
                     requestRebootAfterWebUpdate = true;
                 }
@@ -336,16 +344,16 @@ void WebGui::process()
         broadcastStatus();
     }
 
-	if (requestRebootAfterWebUpdate)
-	{
-		requestRebootAfterWebUpdate = false;
+    if (requestRebootAfterWebUpdate)
+    {
+        requestRebootAfterWebUpdate = false;
 
-		LittleFS.end();
+        LittleFS.end();
 
-		delay(1000);
+        delay(1000);
 
-		ESP.restart();
-	}
+        ESP.restart();
+    }
 }
 
 void WebGui::broadcastStatus()
@@ -371,6 +379,7 @@ String WebGui::createStatusJson()
     doc["time"] = getFormattedTime();
     doc["version"] = GIT_VERSION;
     doc["build"] = __DATE__ " " __TIME__;
+	doc["longPressMs"] = LONG_PRESS_MS;
 
     String json;
     serializeJson(doc, json);
@@ -1145,4 +1154,60 @@ void WebGui::webSocketEventBridge(uint8_t clientNum, WStype_t type, uint8_t *pay
 {
     if (instance != nullptr)
         instance->onWebSocketEvent(clientNum, type, payload, length);
+}
+
+void WebGui::handleCupStart()
+{
+    tuner.startContinuous(CommandType::C_UP);
+
+    server.send(200, "text/plain", "OK");
+}
+
+void WebGui::handleCupStop()
+{
+    tuner.stopContinuous();
+
+    server.send(200, "text/plain", "OK");
+}
+
+void WebGui::handleCdownStart()
+{
+    tuner.startContinuous(CommandType::C_DN);
+
+    server.send(200, "text/plain", "OK");
+}
+
+void WebGui::handleCdownStop()
+{
+    tuner.stopContinuous();
+
+    server.send(200, "text/plain", "OK");
+}
+
+void WebGui::handleLupStart()
+{
+    tuner.startContinuous(CommandType::L_UP);
+
+    server.send(200, "text/plain", "OK");
+}
+
+void WebGui::handleLupStop()
+{
+    tuner.stopContinuous();
+
+    server.send(200, "text/plain", "OK");
+}
+
+void WebGui::handleLdownStart()
+{
+    tuner.startContinuous(CommandType::L_DN);
+
+    server.send(200, "text/plain", "OK");
+}
+
+void WebGui::handleLdownStop()
+{
+    tuner.stopContinuous();
+
+    server.send(200, "text/plain", "OK");
 }

@@ -1,7 +1,7 @@
 #include "TunerController.h"
 
-#include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <LittleFS.h>
 
 void TunerController::begin()
 {
@@ -38,6 +38,11 @@ void TunerController::begin()
 
 void TunerController::process()
 {
+	if (continuousActive)
+	{
+		return;
+	}
+	
     processPulse();
 
     if (pulseActive)
@@ -231,4 +236,49 @@ void TunerController::saveConfig()
 uint8_t TunerController::queuedCommands() const
 {
     return queueCount;
+}
+
+void TunerController::startContinuous(CommandType cmd)
+{
+    uint8_t pin = 0;
+
+    switch (cmd)
+    {
+    case CommandType::C_UP:
+        pin = PIN_C_UP;
+        break;
+
+    case CommandType::C_DN:
+        pin = PIN_C_DN;
+        break;
+
+    case CommandType::L_UP:
+        pin = PIN_L_UP;
+        break;
+
+    case CommandType::L_DN:
+        pin = PIN_L_DN;
+        break;
+
+    default:
+        return;
+    }
+
+    continuousPin = pin;
+
+    continuousActive = true;
+
+    digitalWrite(pin, BUTTON_ACTIVE_LEVEL);
+}
+
+void TunerController::stopContinuous()
+{
+    if (!continuousActive)
+    {
+        return;
+    }
+
+    digitalWrite(continuousPin, BUTTON_IDLE_LEVEL);
+
+    continuousActive = false;
 }

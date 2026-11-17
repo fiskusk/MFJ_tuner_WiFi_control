@@ -24,6 +24,7 @@ constexpr uint8_t PIN_LED1 = D0;      // GPIO16
 constexpr uint8_t PIN_LED2 = D7;      // GPIO13
 
 constexpr uint32_t BUTTON_PRESS_MS = 100;
+constexpr uint32_t LONG_PRESS_MS = 500;
 constexpr uint8_t BUTTON_IDLE_LEVEL   = LOW;
 constexpr uint8_t BUTTON_ACTIVE_LEVEL = HIGH;
 constexpr uint8_t ANT1_SELECT_LEVEL = HIGH;
