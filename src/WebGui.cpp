@@ -133,8 +133,6 @@ void WebGui::begin()
                     processedFiles = 0;
                     expectedFiles = 0;
 
-                    LittleFS.end();
-
                     requestRebootAfterWebUpdate = true;
                 }
             }

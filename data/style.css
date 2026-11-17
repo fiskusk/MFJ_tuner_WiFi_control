@@ -33,15 +33,19 @@ body {
 .settings-panel {
   display: none;
   margin-bottom: 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
 }
 
 .settings-panel.show {
-  display: block;
+  display: grid;
 }
 
 .settings-action {
   width: 100%;
   margin-top: 8px;
+  background: #404040;
+  color: white;
 }
 
 .grid {
@@ -151,24 +155,8 @@ button {
   justify-content: center;
 }
 
-.settings-panel {
-  display: none;
-
-  margin-bottom: 20px;
-
-  grid-template-columns: repeat(4, 1fr);
-
-  gap: 10px;
-}
-
-.settings-panel.show {
-  display: grid;
-}
-
-.settings-action {
-  width: 100%;
-
-  background: #404040;
-
-  color: white;
+.disabled-ui {
+  pointer-events: none;
+  opacity: 0.4;
+  filter: grayscale(100%);
 }

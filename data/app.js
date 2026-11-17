@@ -11,6 +11,7 @@ const settingsPanel = document.getElementById("settingsPanel");
 let currentTime = null;
 let lastWsMessage = Date.now();
 let longPressMs = 500;
+let offline = false;
 
 function post(url) {
   fetch(url, {
@@ -23,62 +24,6 @@ function post(url) {
     .then(updateStatus)
     .catch(console.error);
 }
-
-const cupButton = document.getElementById("cup");
-
-cupButton.addEventListener("pointerdown", () => {
-  post("/api/cup/start");
-});
-
-cupButton.addEventListener("pointerup", () => {
-  post("/api/cup/stop");
-});
-
-cupButton.addEventListener("pointerleave", () => {
-  post("/api/cup/stop");
-});
-
-const cdownButton = document.getElementById("cdown");
-
-cdownButton.addEventListener("pointerdown", () => {
-  post("/api/cdown/start");
-});
-
-cdownButton.addEventListener("pointerup", () => {
-  post("/api/cdown/stop");
-});
-
-cdownButton.addEventListener("pointerleave", () => {
-  post("/api/cdown/stop");
-});
-
-const lupButton = document.getElementById("lup");
-
-lupButton.addEventListener("pointerdown", () => {
-  post("/api/lup/start");
-});
-
-lupButton.addEventListener("pointerup", () => {
-  post("/api/lup/stop");
-});
-
-lupButton.addEventListener("pointerleave", () => {
-  post("/api/lup/stop");
-});
-
-const ldownButton = document.getElementById("ldown");
-
-ldownButton.addEventListener("pointerdown", () => {
-  post("/api/ldown/start");
-});
-
-ldownButton.addEventListener("pointerup", () => {
-  post("/api/ldown/stop");
-});
-
-ldownButton.addEventListener("pointerleave", () => {
-  post("/api/ldown/stop");
-});
 
 function setupLongPress(buttonId, shortUrl, startUrl, stopUrl) {
   const button = document.getElementById(buttonId);
@@ -108,6 +53,14 @@ function setupLongPress(buttonId, shortUrl, startUrl, stopUrl) {
   });
 
   button.addEventListener("pointerleave", () => {
+    clearTimeout(pressTimer);
+
+    if (longPressActive) {
+      post(stopUrl);
+    }
+  });
+
+  button.addEventListener("pointercancel", () => {
     clearTimeout(pressTimer);
 
     if (longPressActive) {
@@ -231,6 +184,10 @@ function updateStatus(data) {
 }
 
 setInterval(() => {
+  if (offline) {
+    return;
+  }
+
   if (!currentTime || currentTime === "--:--:--") {
     return;
   }
@@ -276,12 +233,14 @@ function connectWebSocket() {
 
   ws.onopen = () => {
     console.log("WebSocket connected");
+    setOnlineState();
 
     ws.send("status");
   };
 
   ws.onmessage = (event) => {
     lastWsMessage = Date.now();
+    setOnlineState();
 
     try {
       const data = JSON.parse(event.data);
@@ -309,16 +268,43 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     fetch("/api/status")
       .then((r) => r.json())
-      .then(updateStatus);
+      .then((data) => {
+        lastWsMessage = Date.now();
+
+        updateStatus(data);
+      });
   }
 });
 
 setInterval(() => {
   const age = Date.now() - lastWsMessage;
 
-  if (age > 5000) {
-    console.log("WebSocket timeout");
+  if (age > 5000 && !offline) {
+    setOfflineState();
 
-    location.reload();
+    try {
+      ws.close();
+    } catch (e) {}
   }
 }, 1000);
+
+function setOfflineState() {
+  offline = true;
+
+  document.getElementById("clock").textContent = "--:--:--";
+
+  document.getElementById("uptime").textContent = "UP: offline";
+
+  document.getElementById("rssi").textContent = "--- dBm";
+
+  document.getElementById("ssid").textContent = "Disconnected";
+
+  document.getElementById("ip").textContent = "IP: ---";
+
+  document.querySelector(".grid").classList.add("disabled-ui");
+}
+
+function setOnlineState() {
+  offline = false;
+  document.querySelector(".grid").classList.remove("disabled-ui");
+}
